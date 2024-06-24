@@ -1,0 +1,79 @@
+﻿@page "/StatPage"
+@using System.Globalization
+@using System.Linq
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject IJSRuntime JSRuntime
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+@using Blazorise
+@using Blazorise.Charts
+
+@if (reports != null)
+{
+        <div>
+            <p>Общая выручка: @TotalPrice</p>
+            <p>Чистая прибыль: @NetProfit</p>
+        </div>
+
+        <h4>Таблица проданных товаров</h4>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Название товара</th>
+                    <th>Количество проданных</th>
+                    <th>Выручка</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in SoldProducts)
+            {
+                <tr>
+                    <td>@item.Product.Name</td>
+                    <td>@item.Amount</td>
+                    <td>@item.Price</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+}
+else
+{
+    <p>Отчеты отсутствуют</p>
+}
+
+@code {
+    List<Report> reports = new();
+    double TotalPrice = 0;
+    double NetProfit = 0;
+    double TotalClearPrice = 0;
+    List<ReportItem> SoldProducts = new();
+    List<ChartData<double>> salesData = new List<ChartData<double>>();
+    ChartOptions chartOptions = new ChartOptions();
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            reports = await client.GetFromJsonAsync<List<Report>>($"https://localhost:5001/api/Report/GetReports");
+
+            if (reports != null && reports.Any())
+            {
+                TotalPrice = reports.Sum(r => r.TotalPrice);
+                NetProfit = reports.Sum(r => r.TotalPrice - r.TotalClearPrice);
+                TotalClearPrice = reports.Sum(r => r.TotalClearPrice);
+                SoldProducts = reports.SelectMany(r => r.ReportItems).ToList();
+            }
+
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+
+}

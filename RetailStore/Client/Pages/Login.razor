@@ -1,0 +1,37 @@
+﻿@page "/Login"
+@using System.Security.Claims
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <form @onsubmit="LoginMethod">
+                <h3 class="text-center mb-4">Авторизация</h3>
+                <div class="form-group">
+                    <input type="text" class="form-control" placeholder="Логин" @bind="loginModel.Username" required />
+                </div>
+                <div class="form-group">
+                    <input type="password" class="form-control" placeholder="Пароль" @bind="loginModel.Password" required />
+                </div>
+                <div class="form-group">
+                    <button class="btn btn-primary btn-block">Войти</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new LoginModel();
+
+    private async Task LoginMethod()
+    {
+        // Проведение аутентификации
+        // Здесь может быть логика для отправки данных на сервер и проведения аутентификации
+    }
+
+    public class LoginModel
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
+    }
+}

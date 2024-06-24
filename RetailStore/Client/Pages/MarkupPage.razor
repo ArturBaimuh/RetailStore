@@ -1,0 +1,103 @@
+﻿@page "/Markup"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h3>Наценка</h3>
+
+<!-- Форма для создания нового Markup -->
+<form @onsubmit="CreateNewMarkup">
+    <label for="newProcent">Procent:</label>
+    <input type="number" id="newProcent" @bind="@newMarkup.Procent" step="0.5" required />
+    <button class="btn btn-primary" type="submit">Create</button>
+</form>
+@if (Markups == null)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only"></span>
+        </div>
+    </div>
+}
+else
+{        
+    <!-- Таблица с данными Markup -->
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Procent</th>
+                <th>Save</th>
+                <th>Delete</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var markup in Markups)
+            {
+                <tr>
+                    <td>@markup.Id</td>
+                    <td>
+                        @markup.Procent
+                        @*<input type="number" @bind="@markup.Procent" step="0.01" />*@
+                    </td>
+                    <td>
+                        <button class="btn btn-warning" @onclick="() => UpdateMarkup(markup)">Save</button>
+                    </td>
+                    <td>
+                        <button class="btn btn-danger" @onclick="() => DeleteMarkup(markup.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    // Список Markup и новый Markup для создания
+    List<Markup> Markups = new List<Markup>();
+    Markup newMarkup = new Markup();
+    User user;
+    // Метод для загрузки данных Markup
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>($"https://localhost:5001/api/User/GetUserInfo");
+            await GetMarkups();
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+
+    async Task GetMarkups()
+    {
+        Markups = await client.GetFromJsonAsync<List<Markup>>($"https://localhost:5001/api/Markup/GetMarkups");
+    }
+
+    // Метод для создания нового Markup
+    async Task CreateNewMarkup()
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Markup/Create", newMarkup);
+        await GetMarkups();
+    }
+
+    // Метод для обновления данных Markup
+    async Task UpdateMarkup(Markup markup)
+    {
+
+    }
+
+    // Метод для удаления данных Markup
+    async Task DeleteMarkup(int id)
+    {
+
+    }
+}

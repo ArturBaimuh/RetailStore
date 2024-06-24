@@ -1,0 +1,143 @@
+﻿@page "/ProductPage"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h3>Продукты</h3>
+
+<button class="btn btn-secondary" @onclick="GoToCreator">Создать</button>
+@if (Products.Count == 0)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only"></span>
+        </div>
+    </div>
+}
+else
+{
+    @foreach (var product in Products)
+    {
+        @if(product != null)
+        {
+            <table>
+                <thead>
+                    <tr>
+                        <th>Id</th>
+                        <th>Название</th>
+                        <th>Цена</th>
+                        <th>Поставщик</th>
+                        <th>Склад</th>
+                        <th>Сохранить</th>
+                        <th>Удалить</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>@product.Id</td>
+                        <td><input type="text" @bind="@product.Name"/></td>
+                        <td><input type="number" @bind="@product.Price" step="1"/></td>
+                        <td><input type="text" @bind="@product.Provider.Name"/></td>
+                        <td>
+
+                        </td>
+                        <td><button class="btn btn-warning m-1" @onclick="() => UpdateProduct(product)">Сохранить</button></td>
+                        <td><button class="btn btn-danger m-1" @onclick="() => DeleteProduct(product.Id)">Удалить</button></td>
+                    </tr>
+                </tbody>
+            </table>            
+        }
+@*        <section>
+            <div>
+                <label>Id: @product.Id</label>
+            </div>
+            <div>
+                <label>Название: </label>
+                <input type="text" @bind="@product.Name"/>
+            </div>
+            <div>
+                <label>Цена: </label>
+                <input type="number" @bind="@product.Price" step="0.01"/>
+            </div>
+            <div>
+                <label>Поставщик: </label>
+                <input type="text" @bind="@product.Provider.Name"/>
+            </div>
+            <div>
+                <label>Раздел: </label>
+                <input type="text" @bind="@product.Section.Name"/>
+            </div>
+            <div>
+                <button class="btn btn-warning" @onclick="() => UpdateProduct(product)">Сохранить</button>
+                <button class="btn btn-danger" @onclick="() => DeleteProduct(product.Id)">Удалить</button>
+            </div>
+        </section>*@
+    }    
+}
+
+@code {
+
+    List<Product> Products = new List<Product>();
+    Product newProduct = new Product();
+    List<Provider> Providers = new List<Provider>();
+    List<Section> Sections = new List<Section>();
+
+    User user;
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>($"https://localhost:5001/api/User/GetUserInfo");
+            await GetProducts();
+            await GetProviders();
+            await GetSections();
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+
+    async Task GetProducts()
+    {
+        Products = await client.GetFromJsonAsync<List<Product>>($"https://localhost:5001/api/Product/GetProducts");
+    }
+
+    async Task GetProviders()
+    {
+        Providers = await client.GetFromJsonAsync<List<Provider>>($"https://localhost:5001/api/Provider/GetProviders");
+    }
+
+    async Task GetSections()
+    {
+        Sections = await client.GetFromJsonAsync<List<Section>>($"https://localhost:5001/api/Section/GetSections");
+    }
+
+    async Task CreateNewProduct()
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Product/CreateProduct", newProduct);
+        await GetProducts();
+        newProduct = new Product(); // Очищаем форму после создания
+    }
+
+    async Task UpdateProduct(Product product)
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Product/UpdateProduct", product);
+    }
+
+    async Task DeleteProduct(int id)
+    {
+        await client.DeleteAsync($"https://localhost:5001/api/Product/DeleteProduct/{id}");
+        await GetProducts();
+    }
+    private void GoToCreator()
+    {
+        navigation.NavigateTo("ProductCreator");
+    }
+}

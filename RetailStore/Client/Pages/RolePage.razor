@@ -1,0 +1,88 @@
+﻿@page "/RolePage"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h2>Роли</h2>
+@if (user != null)
+{
+    @if(user.Role.Name != "Admin")
+    {
+        <h3 style="color: red">Отказано в Доступе</h3>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Name</th>
+                    <th>Edit</th>
+                    <th>Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>-</td>
+                    <td><input type="text" id="newProcent" @bind="@newRole.Name"/></td>
+                    <td><button class="btn btn-primary" @onclick="Create">Создать</button></td>
+                </tr>
+            @if (Roles.Count > 0)
+            {
+                @foreach (var role in Roles)
+                {
+                    <tr>
+                        <td>@role.Id</td>
+                        <td><input type="text" id="newProcent" @bind="@role.Name"/></td>
+                        <td><button class="btn btn-info" @onclick="(()=>Update(role))">Обновить</button></td>
+                        <td><button class="btn btn-danger" @onclick="(()=>Delete())">Удалить</button></td>
+                    </tr>
+                }            
+            }
+            </tbody>
+        </table>
+    }
+}
+@code {
+
+    List<Role> Roles = new List<Role>();
+    Role newRole = new();
+    User user;
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>($"https://localhost:5001/api/User/GetUserInfo");
+            await GetRoles();
+            user.Role = Roles.FirstOrDefault(r => r.Id == user.RoleId);
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+    async Task GetRoles()
+    {
+        Roles = await client.GetFromJsonAsync<List<Role>>($"https://localhost:5001/api/Role/GetRoles");
+    }
+    async Task Create()
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Role/CreateRole", newRole);
+        await GetRoles();
+    }
+    async Task Update(Role role)
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Role/UpdateRole", role);
+        await GetRoles();
+    }
+    async Task Delete()
+    {
+        //await client.PostAsJsonAsync($"https://localhost:5001/api/Role/DeleteRole", newRole);
+        //await GetRoles();
+    }
+}

@@ -1,0 +1,148 @@
+﻿@page "/"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h1>Retail Store System</h1>
+
+@if (isAuth)
+{
+    <h4>Имя: @user.Name</h4>
+    <h4>Роль: @user.Role.Name</h4>
+
+    <button class="btn btn-danger" @onclick="LogOut">Выйти</button>
+
+    <h3>Выбрать точку</h3>
+    @if(Shops != null)
+    {
+        <div>
+            <label for="newProductProviderId">Выберите точку:</label>
+            <select id="newProductProviderId" @onchange="OnShopChange">
+                <option value="0">Выбрать...</option>
+                @foreach (var shop in Shops)
+                {
+                    <option value="@shop.Id">@shop.Address</option>
+                }
+            </select>
+        </div>
+    }
+    @if (Shop != null)
+    {
+        <div>
+            <p>Адрес магазина: @Shop.Address</p>
+            <p>Адрес склада: @Shop.Stock.Address</p>
+        </div>
+    }
+}
+else
+{
+    <form>
+      <div class="form-group">
+        <label for="exampleInputEmail1">Email address</label>
+        <input type="email" class="form-control" @bind="authView.Email" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter email">
+      </div>
+      <div class="form-group">
+        <label for="exampleInputPassword1">Password</label>
+        <input type="password" class="form-control" @bind="authView.Password" id="exampleInputPassword1" placeholder="Password">
+      </div>
+
+      <button type="button" class="btn btn-primary" @onclick="Authorize">Войти</button>
+    </form>
+}
+
+@code{
+    AuthView authView = new AuthView();
+    AuthInfo authInfo = new AuthInfo();
+    private bool isAuthenticated = false;
+    User user;
+    bool isAuth = false;
+    List<Shop> Shops = new List<Shop>();
+    Shop Shop;
+    int id = 0;
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>($"https://localhost:5001/api/User/GetUserInfo");
+            var Roles = await client.GetFromJsonAsync<List<Role>>($"https://localhost:5001/api/Role/GetRoles");
+            user.Role = Roles.FirstOrDefault(r => r.Id == user.RoleId);
+            isAuth = true;
+            await GetShops();
+        }
+        catch (Exception ex)
+        {
+            isAuth = false;
+        }
+    }
+    private async Task Authorize()
+    {
+        try
+        {
+            var response = await AuthenticateAsync(authView.Email, authView.Password);
+            if (response.IsSuccessStatusCode)
+            {
+                var tokenResponse = await response.Content.ReadFromJsonAsync<TokenResponse>();
+
+                // Можно сохранить токен в безопасном месте, например, в Cookie или localStorage.
+                authInfo.Key = tokenResponse.Access_token;
+                // Установка Bearer токена в заголовке Authorization
+                client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authInfo.Key);
+
+                await localStorage.SetItemAsync(AuthInfo.CookieName, authInfo);
+
+                navigation.NavigateTo("");
+            }
+            else
+            {
+                isAuthenticated = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            isAuthenticated = false;
+        }
+    }
+    private async Task<HttpResponseMessage> AuthenticateAsync(string username, string password)
+    {
+        var requestBody = new FormUrlEncodedContent(new[]
+        {
+            new KeyValuePair<string, string>("username", username),
+            new KeyValuePair<string, string>("password", password),
+    });
+
+        User user = new()
+        {
+            Email = username,
+            Password = password,
+        };
+
+        return await client.PostAsJsonAsync("https://localhost:5001/api/User/Token", user);
+    }
+    public class TokenResponse
+    {
+        public string? Access_token { get; set; }
+    }
+    async Task LogOut()
+    {
+        await localStorage.ClearAsync();
+        navigation.NavigateTo("");
+    }
+    async Task GetShop()
+    {
+        Shop = await client.GetFromJsonAsync<Shop>($"https://localhost:5001/api/Shop/GetShop?id={id}");
+    }
+    async Task GetShops()
+    {
+        Shops = await client.GetFromJsonAsync<List<Shop>>($"https://localhost:5001/api/Shop/GetShops");
+    }
+    async Task OnShopChange(ChangeEventArgs e)
+    {
+        id = int.Parse(e.Value.ToString());
+        await GetShop();
+    }
+}

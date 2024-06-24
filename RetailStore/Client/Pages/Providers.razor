@@ -1,0 +1,98 @@
+﻿@page "/Providers"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h3>Поставщики</h3>
+
+<form @onsubmit="CreateNewProvider">
+    <label for="newPrvider">Поставщик:</label>
+    <input type="text" id="newProcent" @bind="@newProvider.Name"/>
+    <button class="btn btn-primary" type="submit">Create</button>
+</form>
+@if (ProvidersList.Count == 0)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only"></span>
+        </div>
+    </div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Procent</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var provider in ProvidersList)
+            {
+                <tr>
+                    <td>@provider.Id</td>
+                    <td>
+                
+                        <input type="text" @bind="@provider.Name"/>
+                    </td>
+                    <td>
+                        <button class="btn btn-warning" @onclick="() => UpdateProvider(provider)">Save</button>
+                    </td>
+                    <td>
+                        <button class="btn btn-danger" @onclick="() => DeleteProvider(provider.Id)">Delete</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>    
+}
+
+@code {
+
+    List<Provider> ProvidersList = new List<Provider>();
+    Provider newProvider = new Provider();
+
+    User user;
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>($"https://localhost:5001/api/User/GetUserInfo");
+            await GetProviders();
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+
+    async Task GetProviders()
+    {
+        ProvidersList = await client.GetFromJsonAsync<List<Provider>>($"https://localhost:5001/api/Provider/GetProviders");
+    }
+
+    async Task CreateNewProvider()
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Provider/CreateProvider", newProvider);
+        await GetProviders();
+    }
+
+    async Task UpdateProvider(Provider markup)
+    {
+
+    }
+
+    async Task DeleteProvider(int id)
+    {
+
+    }
+}
+

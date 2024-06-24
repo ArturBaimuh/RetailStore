@@ -1,0 +1,111 @@
+﻿@page "/SectionPage"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h3>Разделы</h3>
+
+
+<form @onsubmit="CreateNewSection">
+    <label for="newSection">Раздел:</label>
+    <input type="text" id="newSection" @bind="@newSection.Name"/>
+
+    <label for="markupId">Выберите Markup:</label>
+    <select id="markupId" @bind="@newSection.MarkupId">
+        <option>Выбрать</option>
+        @foreach (var markup in Markups)
+        {
+            <option value="@markup.Id">@markup.Procent</option>
+        }
+    </select>
+
+    <button class="btn btn-primary" type="submit">Create</button>
+</form>
+@if (Sections.Count == 0)
+{
+    <div class="text-center">
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only"></span>
+        </div>
+    </div>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Название</th>
+                <th>Сохранить</th>
+                <th>Удалить</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var section in Sections)
+            {
+                <tr>
+                    <td>@section.Id</td>
+                    <td><input type="text" @bind="@section.Name"/></td>
+                    <td><button class="btn btn-warning m-1" @onclick="() => UpdateSection(section)">Сохранить</button></td>
+                    <td><button class="btn btn-danger m-1" @onclick="() => DeleteSection(section.Id)">Удалить</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+
+    List<Section> Sections = new List<Section>();
+    Section newSection = new Section();
+    List<Markup> Markups = new List<Markup>();
+
+    User user;
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>($"https://localhost:5001/api/User/GetUserInfo");
+            await GetSections();
+            await GetMarkups();
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+
+    async Task GetSections()
+    {
+        Sections = await client.GetFromJsonAsync<List<Section>>($"https://localhost:5001/api/Section/GetSections");
+    }
+
+    async Task GetMarkups()
+    {
+        Markups = await client.GetFromJsonAsync<List<Markup>>($"https://localhost:5001/api/Markup/GetMarkups");
+    }
+
+    async Task CreateNewSection()
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Section/CreateSection", newSection);
+        await GetSections();
+        newSection = new Section(); // Очищаем форму после создания
+    }
+
+    async Task UpdateSection(Section section)
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Section/UpdateSection", section);
+    }
+
+    async Task DeleteSection(int id)
+    {
+        await client.DeleteAsync($"https://localhost:5001/api/Section/DeleteSection/{id}");
+        await GetSections();
+    }
+}

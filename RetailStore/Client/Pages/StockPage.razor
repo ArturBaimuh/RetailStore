@@ -1,0 +1,97 @@
+﻿@page "/StockPage"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h2>Склады</h2>
+
+<form @onsubmit="CreateNewStock">
+    <label for="newProcent">Address:</label>
+    <input type="text" id="newProcent" @bind="@newStock.Address" required />
+    <button class="btn btn-primary" type="submit">Create</button>
+</form>
+
+@if (Stocks != null)
+{
+    <div>
+        <label for="newProductProviderId">Выберите поставщика:</label>
+        <select id="newProductProviderId" @onchange="OnStockChange">
+            <option value="0">Выбрать...</option>
+            @foreach (var stock in Stocks)
+            {
+                <option value="@stock.Id">@stock.Address</option>
+            }
+        </select>
+    </div>
+
+    @if (Products != null && Products.Any())
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Цена</th>
+                    <th>Количество</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var product in Products)
+                {
+                    <tr>
+                        <td>@product.Name</td>
+                        <td>@product.Price</td>
+                        <td>@product.Amount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+    List<Stock> Stocks = new List<Stock>();
+    List<Product> Products = new List<Product>();
+    Stock newStock = new Stock();
+    User user;
+    int id = 0;
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>("https://localhost:5001/api/User/GetUserInfo");
+            await GetStocks();
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+
+    async Task GetStocks()
+    {
+        Stocks = await client.GetFromJsonAsync<List<Stock>>("https://localhost:5001/api/Stock/GetStocks");
+    }
+
+    async Task CreateNewStock()
+    {
+        await client.PostAsJsonAsync("https://localhost:5001/api/Stock/CreateStock", newStock);
+        await GetStocks();
+    }
+
+    async Task GetStockProducts()
+    {
+        Products = await client.GetFromJsonAsync<List<Product>>($"https://localhost:5001/api/Product/GetProductsForStock?idStock={id}");
+    }
+
+    async Task OnStockChange(ChangeEventArgs e)
+    {
+        id = int.Parse(e.Value.ToString());
+        await GetStockProducts();
+    }
+}

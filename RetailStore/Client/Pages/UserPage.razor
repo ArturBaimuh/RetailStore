@@ -1,0 +1,121 @@
+﻿@page "/UserPage"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h2>Пользователи</h2>
+@if (user != null)
+{
+    @if(user.Role.Name != "Admin")
+    {
+        <h3 style="color: red">Отказано в Доступе</h3>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Password</th>
+                    <th>Role</th>
+                    <th>Edit</th>
+                    <th>Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>-</td>
+                    <td><input type="text" id="newProcent" @bind="@newUser.Name"/></td>
+                    <td><input type="text" id="newProcent" @bind="@newUser.Email"/></td>
+                    <td><input type="text" id="newProcent" @bind="@newUser.Password"/></td>
+                    <td>
+                        <select id="newProductSectionId" @bind="@newUser.RoleId">
+                            <option >Выбрать...</option>
+                            @foreach (var role in Roles)
+                            {
+                                <option value="@role.Id">@role.Name</option>
+                            }
+                        </select>
+
+                    </td>
+                    <td><button class="btn btn-primary" @onclick="Create">Создать</button></td>
+                </tr>
+                @if(Roles.Count != 0)
+                {
+                    @foreach (var user in Users)
+                    {
+                        <tr>
+                            <td>@user.Id</td>
+                            <td><input type="text" id="newProcent" @bind="@user.Name"/></td>
+                            <td><input type="text" id="newProcent" @bind="@user.Email"/></td>
+                            <td><input type="text" id="newProcent" @bind="@user.Password"/></td>
+                            <td>
+                                <select id="newProductSectionId" @bind="@user.RoleId">
+                                    @foreach (var role in Roles)
+                                    {
+                                        <option value="@role.Id">@role.Name</option>
+                                    }
+                                </select>
+
+                            </td>
+                            <td><button class="btn btn-info" @onclick="(()=>Update(user))">Обновить</button></td>
+                            <td><button class="btn btn-danger" @onclick="(()=>Delete(user.Id))">Удалить</button></td>
+                        </tr>
+                    }                
+                }
+            </tbody>
+        </table>
+    }
+}
+
+@code {
+
+    List<User> Users = new List<User>();
+    List<Role> Roles = new List<Role>();
+    User newUser = new();
+    User user;
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>($"https://localhost:5001/api/User/GetUserInfo");
+            await GetRoles();
+            await GetUsers();
+            user.Role = Roles.FirstOrDefault(r => r.Id == user.RoleId);
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+    async Task GetUsers()
+    {
+        Users = await client.GetFromJsonAsync<List<User>>($"https://localhost:5001/api/User/GetUsers");
+    }
+    async Task GetRoles()
+    {
+        Roles = await client.GetFromJsonAsync<List<Role>>($"https://localhost:5001/api/Role/GetRoles");
+    }
+    async Task Create()
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/User/CreateUser", newUser);
+        await GetUsers();
+    }
+    async Task Update(User user)
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/User/Create", newUser);
+        await GetUsers();
+    }
+    async Task Delete(int id)
+    {
+        //await client.GetFromJsonAsync($"https://localhost:5001/api/User/DeleteUser?id={id}");
+        //await GetUsers();
+    }
+}

@@ -1,0 +1,230 @@
+﻿@page "/SellPage"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+@if(shop == null)
+{
+    @if (Shops != null)
+    {
+        <div>
+            <label for="newProductProviderId">Выберите магазин:</label>
+            <select id="newProductProviderId" @onchange="OnShopChange">
+                <option value="0">Выбрать...</option>
+            @foreach (var shop in Shops)
+            {
+                <option value="@shop.Id">@shop.Address</option>
+            }
+            </select>
+        </div>
+    }
+}
+else
+{
+    <div class="input-group mb-3">
+      <input type="text" class="form-control" @bind="name" placeholder="Название" aria-label="Recipient's username" aria-describedby="basic-addon2">
+      <div class="input-group-append">
+        <button class="btn btn-primary oi oi-magnifying-glass" @onclick="(()=>GetProductsByName(name))"></button>
+      </div>
+    </div>
+    <div class="input-group mb-3">
+      <input type="text" class="form-control" @bind="barcode" placeholder="Штихкод" aria-label="Recipient's username" aria-describedby="basic-addon2">
+      <div class="input-group-append">
+        <button class="btn btn-primary oi oi-magnifying-glass" @onclick="(()=>GetProductsByBarCode(barcode))"></button>
+      </div>
+    </div>
+    <hr>
+
+    @if (products.Count > 0)
+    {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Штрихкод</th>
+                        <th>Цена</th>
+                        <th>Количество</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var product in products)
+                {
+                    <tr>
+                        <td>@product.Name</td>
+                        <td>@product.Barcode</td>
+                        <td>@product.Price</td>
+                        <td>@product.Amount</td>
+                        <td><button class="btn btn-info" @onclick="(()=>ChooseProduct(product))">Выбрать</button></td>
+                    </tr>                
+                }
+                </tbody>
+            </table>
+    }
+    <hr>
+
+    @if (reportItem.Product != null)
+    {
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Название</th>
+                        <th>Цена</th>
+                        <th>Штихкод</th>
+                        <th>Количество</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>@reportItem.Product.Name</td>
+                    <td>@(reportItem.Product.Price + ((reportItem.Procent / 100) * reportItem.Product.Price))</td>
+                    <td>@reportItem.Product.Barcode</td>
+                        <td>@reportItem.Product.Amount</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <input type="number" id="newProductPrice" step="1"class="form-control m-2" @bind="reportItem.Amount" placeholder="Количество">
+
+            <h5>Цена: @(reportItem.Product.Price * reportItem.Amount)</h5>
+
+            <button class="btn btn-warning m-1" @onclick="AddProduct">Добавить</button>
+            <td><button class="btn btn-danger m-1" @onclick="Del">Отмена</button></td>
+    }
+    <hr>
+
+    @if (report.ReportItems.Count > 0)
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Количество</th>
+                    <th>Цена</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var ri in report.ReportItems)
+                {
+                    <tr>
+                        <td>@ri.Product.Name</td>
+                        <td>@ri.Amount</td>
+                        <td>@ri.Price</td>
+                        <td><button class="btn btn-danger" @onclick="() => RemoveReportItem(ri)">Удалить</button></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <h4>Итого: @report.TotalPrice</h4>
+        <button class="btn btn-primary" @onclick="Create">Создать</button>
+    }
+}
+@code {
+    User user;
+
+    List<Product> products = new();
+    ReportItem reportItem = new() { Amount = 0 };
+    Report report = new() { ReportItems = new List<ReportItem>() };
+    string barcode;
+    string name;
+
+    List<Shop> Shops = new List<Shop>();
+    int id = 0;
+
+    Shop shop;
+
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>($"https://localhost:5001/api/User/GetUserInfo");
+            await GetShops();
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+    async Task ChooseProduct(Product product)
+    {
+        product.Provider = null;
+        reportItem.Product = product;
+        reportItem.ProductId = product.Id;
+        reportItem.isAmount = product.isAmount;
+        reportItem.isWight = product.isWight;
+
+        var section = await client.GetFromJsonAsync<Section>($"https://localhost:5001/api/Section/GetSection?id={product.SectionId}");
+        reportItem.Procent = section.Markup.Procent;
+
+        products = new();
+    }
+    async Task AddProduct()
+    {
+        reportItem.Price = reportItem.Product.Price * reportItem.Amount;
+        report.TotalClearPrice += reportItem.Price;
+        reportItem.Price = reportItem.Price + ((reportItem.Procent / 100) * reportItem.Price);
+        report.TotalPrice += reportItem.Price;
+        report.ReportItems.Add(reportItem);
+
+        reportItem = new() { Amount = 0 };
+
+    }
+    async Task GetProductsByName(string name)
+    {
+        products = await client.GetFromJsonAsync<List<Product>>($"https://localhost:5001/api/Product/GetProductsByName?name={name}&id={shop.Stock.Id}");
+        name = string.Empty;
+    }
+    async Task GetProductsByBarCode(string barcode)
+    {
+        products = await client.GetFromJsonAsync<List<Product>>($"https://localhost:5001/api/Product/GetProductsByBarcode?barcode={barcode}&id={shop.Stock.Id}");
+        barcode = string.Empty;
+    }
+    async Task Create()
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Report/CreateReport", report);
+        
+        products = new();
+        reportItem = new() { Amount = 0 };
+        report = new() { ReportItems = new List<ReportItem>() };
+        barcode = string.Empty;
+        name = string.Empty;
+
+    }
+    void GoToReport()
+    {
+        navigation.NavigateTo("ReportPage");
+    }
+    void Del()
+    {
+        reportItem.Product = null;
+        reportItem.Procent = 0;
+    }
+    async Task RemoveReportItem(ReportItem item)
+    {
+        // Удаление reportItem из списка ReportItems
+        report.ReportItems.Remove(item);
+
+        // Уменьшение TotalClearPrice и TotalPrice
+        report.TotalClearPrice -= item.Product.Price * item.Amount;
+        report.TotalPrice -= item.Price;
+    }
+    async Task GetShop()
+    {
+        shop = await client.GetFromJsonAsync<Shop>($"https://localhost:5001/api/Shop/GetShop?id={id}");
+    }
+
+    async Task OnShopChange(ChangeEventArgs e)
+    {
+        id = int.Parse(e.Value.ToString());
+        await GetShop();
+    }
+    async Task GetShops()
+    {
+        Shops = await client.GetFromJsonAsync<List<Shop>>($"https://localhost:5001/api/Shop/GetShops");
+    }
+}

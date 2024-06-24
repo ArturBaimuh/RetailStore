@@ -1,0 +1,156 @@
+﻿@page "/ProductCreator"
+@using ReatailStore.Domain.Entities;
+@using ReatailStore.Domain.SupportData;
+@using System.Net.Http.Headers;
+@inject HttpClient client
+@inject NavigationManager navigation
+@inject Blazored.LocalStorage.ILocalStorageService localStorage
+
+<h3>Завоз товара</h3>
+
+<br>
+<button class="btn btn-secondary m-2" @onclick="GoToPR">Назад</button>
+
+<form @onsubmit="CreateNewProduct">
+    <div>
+        <label for="newProductName">Название продукта:</label>
+        <input type="text" id="newProductName" @bind="@newProduct.Name"/>
+    </div>
+
+    <div>
+        <label for="newProductPrice">Цена:</label>
+        <input type="number" id="newProductPrice" @bind="@newProduct.Price" step="1"/>
+    </div>
+
+    <div>
+        <label for="newProductProviderId">Выберите поставщика:</label>
+        <select id="newProductProviderId" @bind="@newProduct.ProviderId">
+            <option >Выбрать...</option>
+            @foreach (var provider in Providers)
+            {
+                    <option value="@provider.Id">@provider.Name</option>
+            }
+        </select>
+    </div>
+
+    <div>
+        <label for="newProductSectionId">Выберите раздел:</label>
+        <select id="newProductSectionId" @bind="@newProduct.SectionId">
+            <option >Выбрать...</option>
+            @foreach (var section in Sections)
+            {
+                    <option value="@section.Id">@section.Name</option>
+            }
+        </select>
+    </div>
+
+    <div>
+        <label for="newProductSectionId">Выберите склад:</label>
+        <select id="newProductSectionId" @bind="@newProduct.StockId">
+            <option >Выбрать...</option>
+            @foreach (var stock in Stocks)
+            {
+                <option value="@stock.Id">@stock.Address</option>
+            }
+        </select>
+    </div>
+
+    <div>
+        <label for="newProductAmount">Количество:</label>
+        <input type="number" id="newProductAmount" @bind="@newProduct.Amount"/>
+    </div>
+
+    <div>
+        <label for="newProductDateValidFrom">Дата начала действия:</label>
+        <input type="date" id="newProductDateValidFrom" @bind="@newProduct.DateValidFrom"/>
+    </div>
+
+    <div>
+        <label for="newProductDateValidTo">Дата окончания действия:</label>
+        <input type="date" id="newProductDateValidTo" @bind="@newProduct.DateValidTo"/>
+    </div>
+
+    <div>
+        <label for="newProductBarcode">Штрих-код:</label>
+        <input type="text" id="newProductBarcode" @bind="@newProduct.Barcode"/>
+    </div>
+
+    <div>
+        <label for="newProductWeight">Вес:</label>
+        <input type="number" id="newProductWeight" @bind="@newProduct.Weight" step="0.01"/>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Создать</button>
+</form>
+
+
+@code {
+
+    List<Product> Products = new List<Product>();
+    Product newProduct = new Product();
+    List<Provider> Providers = new List<Provider>();
+    List<Section> Sections = new List<Section>();
+    List<Stock> Stocks = new List<Stock>();
+    User user;
+    protected async override Task OnInitializedAsync()
+    {
+        try
+        {
+            var cookieContent = await localStorage.GetItemAsync<AuthInfo>(AuthInfo.CookieName);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cookieContent.Key);
+            user = await client.GetFromJsonAsync<User>($"https://localhost:5001/api/User/GetUserInfo");
+            await GetProducts();
+            await GetProviders();
+            await GetSections();
+            await GetStocks();
+            await GetProducts();
+        }
+        catch (Exception ex)
+        {
+            navigation.NavigateTo("");
+        }
+    }
+
+    async Task GetProducts()
+    {
+        Products = await client.GetFromJsonAsync<List<Product>>($"https://localhost:5001/api/Product/GetProducts");
+    }
+
+    async Task GetProviders()
+    {
+        Providers = await client.GetFromJsonAsync<List<Provider>>($"https://localhost:5001/api/Provider/GetProviders");
+    }
+
+    async Task GetSections()
+    {
+        Sections = await client.GetFromJsonAsync<List<Section>>($"https://localhost:5001/api/Section/GetSections");
+    }
+    async Task GetStocks()
+    {
+        Stocks = await client.GetFromJsonAsync<List<Stock>>($"https://localhost:5001/api/Stock/GetStocks");
+    }
+
+    async Task CreateNewProduct()
+    {
+        newProduct.isAmount = true;
+        newProduct.isWight = false;
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Product/CreateProduct", newProduct);
+        await GetProducts();
+        newProduct = new Product(); // Очищаем форму после создания
+    }
+
+    async Task UpdateProduct(Product product)
+    {
+        await client.PostAsJsonAsync($"https://localhost:5001/api/Product/UpdateProduct", product);
+    }
+
+    async Task DeleteProduct(int id)
+    {
+        await client.DeleteAsync($"https://localhost:5001/api/Product/DeleteProduct/{id}");
+        await GetProducts();
+    }
+    void GoToPR()
+    {
+        navigation.NavigateTo("ProductPage");
+    }
+}
